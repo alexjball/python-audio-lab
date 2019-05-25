@@ -4,6 +4,8 @@ import pyaudio
 import wave
 import scipy.io.wavfile as wavfile
 import matplotlib.pyplot as plt
+from pprint import pprint
+import time
 
 CHUNK = 1024
 FORMAT = pyaudio.paInt16
@@ -13,6 +15,9 @@ RECORD_SECONDS = 5
 WAVE_OUTPUT_FILENAME = "output.wav"
 
 p = pyaudio.PyAudio()
+
+pprint(p.get_default_input_device_info())
+pprint(p.get_default_host_api_info())
 
 stream = p.open(format=FORMAT,
                 channels=CHANNELS,
@@ -25,6 +30,8 @@ print("* recording")
 frames = []
 
 for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
+    while stream.get_read_available() == 0:
+        time.sleep(RATE / CHUNK)
     data = stream.read(CHUNK)
     frames.append(data)
 
