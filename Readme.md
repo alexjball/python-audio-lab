@@ -4,7 +4,7 @@ Explore/prototype approaches for automatic guitar transcription.
 # Non-goals
 Create something tha works outside a dev/rapid-eval environment
 
-# MVP Requirements
+# MVP RequirementsStructure
 1. Processing/analyzing an audio stream
 2. Command line for running analyses on files or audio inputs
 3. UX prototype GUI. Displays analysis in an interactive or live fassion.
@@ -27,3 +27,6 @@ class
 
 ## Signal Sources
 
+<!--stackedit_data:
+eyJoaXN0b3J5IjpbMTI1MjA3MDQ0XX0=
+-->
