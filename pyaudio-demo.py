@@ -31,7 +31,8 @@ frames = []
 
 for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
     while stream.get_read_available() == 0:
-        time.sleep(RATE / CHUNK)
+        print("no input available")
+        time.sleep(CHUNK / RATE)
     data = stream.read(CHUNK)
     frames.append(data)
 
