@@ -17,8 +17,9 @@ Jupyter notebooks are composed of cells of code or markdown. Code cells execute 
 
 The page will have a global input/output buffer that is initialized with the notebook. The user uses this to set up their source, and cells use this to read and output processed audio. Ideally, the user can use the same interface to process audio files/existing sound, and the filtering cells access a common abstraction.
 
-# Next Steps
+# Release
 I should either render a notebook or use it to render images for a blog post about measuring guitar pickups. 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTI1Mzc2ODc5NiwxMjUyMDcwNDRdfQ==
+eyJoaXN0b3J5IjpbLTgzOTQ2Mjk5OSwtMjUzNzY4Nzk2LDEyNT
+IwNzA0NF19
 -->
