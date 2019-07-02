@@ -20,10 +20,14 @@ Jupyter notebooks are composed of cells of code or markdown. Code cells execute 
 The page will have a global input/output buffer that is initialized with the notebook. The user uses this to set up their source, and cells use this to read and output processed audio. Ideally, the user can use the same interface to process audio files/existing sound, and the filtering cells access a common abstraction.
 
 # Release
-I will initially use the library for my own blog posts, and advertise the library after it's matured. But I should make the library
+I will initially use the library for my own blog posts, and advertise the library after it's matured. But I should make the library public asap, for transparency. Some blog post ideas:
+- Guitar pickup transfer function -- How is this different from the existing articles?
+- Effect simulation
+- Pitch estimation
+- Mea
 I should either render a notebook or use it to render images for a blog post about measuring guitar pickups. I can follow up with other articles while I polish the library.
 
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTE1ODEwNjA2MzMsMTA0NjcxOTkyMF19
+eyJoaXN0b3J5IjpbMTQzNDc1NDY2OCwxMDQ2NzE5OTIwXX0=
 -->
