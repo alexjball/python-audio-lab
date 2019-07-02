@@ -1,4 +1,6 @@
 import pyaudio
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 import numpy as np
 from IPython.display import display
 import ipywidgets as widgets
@@ -6,16 +8,18 @@ from pprint import pprint
 import logging
 import threading
 import librosa
+import librosa.display
 import time
 
 import jupyter_utils
 
 # Set up the root logger and display its output in this cell.
 logger = jupyter_utils.get_cell_logger(__name__)
+logger.setLevel(logging.DEBUG)
 
 def print_pyaudio_devices():
     """Print info about host API's, devices, and defaults"""
-    
+
     # Initialize PyAudio
     pa = pyaudio.PyAudio()
     default_host_index = pa.get_default_host_api_info()['index']
@@ -37,19 +41,21 @@ def print_pyaudio_devices():
     # Clean up PyAudio
     pa.terminate()
 
+
 class AudioConstants:
     """Constants used by framework types"""
     # Sampling rate and the number of channels must be consistent throughout the graph, so
-    # these are chosen to support stereo at a sampling rate supported by the Scarlett. 
-    # TODO: move these into framework object configuration, or configuration owned by 
+    # these are chosen to support stereo at a sampling rate supported by the Scarlett.
+    # TODO: move these into framework object configuration, or configuration owned by
     # clients.
-    sampling_rate=44100
-    num_channels=2
-    dtype=np.float64
+    sampling_rate = 44100
+    num_channels = 1
+    dtype = np.float64
 
     # The max value of a numpy index, which is a safe upper bound for the max number of
     # frames that can be read or written.
     unlimited_frames = np.iinfo(np.intp).max
+
 
 class AudioSource:
     """Simple interface for sources"""
@@ -78,7 +84,7 @@ class AudioSink:
 class AudioStream(AudioSink):
     # TODO: Consider using a generic message as the payload rather than raw data.
     #       this would also allow sending control signals (stream start/end) over
-    #       the graph and attaching more info to raw data. 
+    #       the graph and attaching more info to raw data.
     # TODO: Test
 
     def __init__(self):
@@ -95,7 +101,7 @@ class AudioStream(AudioSink):
             self.sinks.append(sink)
 
     def remove_sink(self, sink):
-        self.sink.remove(sink)
+        self.sinks.remove(sink)
 
     def write(self, data):
         """Writes data to the channel, blocking until all sinks have handled the data."""
@@ -106,13 +112,15 @@ class AudioStream(AudioSink):
             raise RuntimeError("Write cycle detected.")
 
         self.is_writing = True
-        for sink in self.sinks:
-            # This uses recursion to pass control to sinks, resulting in a depth-first traversal.
-            # So memory usage is O(N) for a maximum chain of N streams. It could be more efficient
-            # to evaluate the graph not in depth first order or without recursion, but this is
-            # the simplest.
-            sink.write(data)
-        self.is_writing = False
+        try:
+            for sink in self.sinks:
+                # This uses recursion to pass control to sinks, resulting in a depth-first traversal.
+                # So memory usage is O(N) for a maximum chain of N streams. It could be more efficient
+                # to evaluate the graph not in depth first order or without recursion, but this is
+                # the simplest.
+                sink.write(data)
+        finally:
+            self.is_writing = False
 
     def write_available(self):
         """Returns the number of frames that can be written without potentially blocking.
@@ -168,20 +176,20 @@ class AudioTransform:
             # block. Return a conservative value here, which is fine since transforms are
             # used in a blocking context anyway.
             return 0
-        
+
         def take(self):
             assert self.data is not None
             data = self.data
             self.data = None
             return data
-        
+
         def reset(self):
             self.data = None
 
     def __init__(self):
         self.inputs = []
         self.unset_inputs = set()
-                
+
     def apply():
         """Read from inputs and write to outputs or perform other operations.
         
@@ -192,7 +200,7 @@ class AudioTransform:
 
     def add_input(self, input):
         assert input.owner is None and input not in self.inputs
-        
+
         input.owner = self
         input.reset()
         self.inputs.append(input)
@@ -200,20 +208,22 @@ class AudioTransform:
 
     def remove_input(self, input):
         assert input.owner == self and input in self.inputs
-        
+
         self.inputs.remove(input)
         if input.id in self.unse_inputs:
             self.unset_inputs.remove(input.id)
 
     def _handle_write(self, input):
-        logger.info(f'_handle_write input.id {input.id} unset_inputs {self.unset_inputs}')
+        logger.info(
+            f'_handle_write input.id {input.id} unset_inputs {self.unset_inputs}'
+        )
         assert input in self.inputs and input.id in self.unset_inputs
-        
+
         self.unset_inputs.remove(input.id)
         if not self.unset_inputs:
             self.apply()
             self.reset()
-            
+
     def reset(self):
         """resets all inputs"""
         self.unset_inputs = set()
@@ -225,7 +235,10 @@ class AudioTransform:
 class AudioQueue(AudioSource, AudioSink):
     """A blocking queue used to pass audio data between threads."""
 
-    def __init__(self, num_channels=AudioConstants.num_channels, num_frames=1024, dtype=AudioConstants.dtype):
+    def __init__(self,
+                 num_channels=AudioConstants.num_channels,
+                 num_frames=1024,
+                 dtype=AudioConstants.dtype):
         self.num_channels = num_channels
         self.num_frames = num_frames
 
@@ -253,8 +266,7 @@ class AudioQueue(AudioSource, AudioSink):
         with self.lock:
             self.write_marker = 0
             self.read_marker = 0
-        
-        
+
     def write(self, data):
         """Writes data to the queue, blocking until everything is transfered into the queue's buffer.
         
@@ -290,6 +302,9 @@ class AudioQueue(AudioSource, AudioSink):
         to_write = min(self.write_available(), data.shape[0])
 
         assert data_placement.size == to_write
+#         logger.info(f'stats {data_placement.size} {to_write}, ' + 
+#                        f'{self.write_marker}, {self.read_marker}, {data.shape}, ' +
+#                        f'{self.num_frames}')
 
         self.data[data_placement, :] = data[0:to_write, :]
         self.write_marker += to_write
@@ -346,21 +361,22 @@ class AudioQueue(AudioSource, AudioSink):
 
         return output
 
+
 class AudioBuffer(AudioQueue):
     """Drops frames instead of blocking on write"""
 
     def write(self, data):
-        frames_to_write = data.shape[1]
+        frames_to_write = data.shape[0]
         write_available = super().write_available()
         if frames_to_write > write_available:
-            logger.debug(
-                f'Dropping {frames_to_write - write_available} frames')
+            logger.debug(f'Dropping {frames_to_write - write_available} frames')
             frames_to_write = write_available
         if frames_to_write:
-            super().write(data[:, :])
+            super().write(data[:frames_to_write, :])
 
     def write_available(self):
         return AudioConstants.unlimited_frames
+
 
 class Gain(AudioTransform):
 
@@ -372,6 +388,7 @@ class Gain(AudioTransform):
 
     def apply(self):
         self.output.write(self.level * self.input.take())
+
 
 class AudioFileLoader:
     """Loads audio data from a file and writes to an AudioStream.
@@ -387,31 +404,30 @@ class AudioFileLoader:
     def load_async(self, source):
         if self._load_thread:
             raise RuntimeError("Already loading async")
-            
+
         def load():
             try:
                 self.load(source)
                 self._load_thread = None
             except:
                 logger.error("Error loading file", exc_info=True)
-            
+
         self._load_thread = threading.Thread(target=load)
         self._load_thread.start()
-        
-    def wait_for_load(self, timeout = None):
+
+    def wait_for_load(self, timeout=None):
         load_thread = self._load_thread
         if load_thread:
             load_thread.join(timeout)
-        
+
     def is_loading(self):
         return self._load_thread is not None
-    
+
     def load(self, source):
         """Loads the source"""
 
         if AudioConstants.num_channels > 2:
-            raise NotImplementedError(
-                "Only mono or stereo supported for files")
+            raise NotImplementedError("Only mono or stereo supported for files")
 
         # Load the source, either as (n,) mono or (2, n) stereo
         source_data, _ = librosa.load(source,
@@ -427,7 +443,7 @@ class AudioFileLoader:
             source_data = source_data.transpose()
 
         self.output.write(source_data)
-            
+
     def reset(self):
         if isinstance(self._source, AudioStream):
             self._source.remove_sink(self._stream_sink)
@@ -446,10 +462,31 @@ class AudioFileLoader:
             raise RuntimeError("No source loaded")
         return self._buffer.read_available()
 
+
+class PerfTimer:
+    def __init__(self, name, n = 100, period = 1):
+        self.name = name
+        self.n = n
+        self.period = period
+        self.dt = []
     
+    def start(self):
+        self.start_time = time.perf_counter()
+    
+    def end(self):
+        self.dt.append(time.perf_counter() - self.start_time)
+        if len(self.dt) >= self.n:
+            self.log_stats(np.array(self.dt))
+            self.dt = []
+    
+    def log_stats(self, dt):
+        load = dt / self.period
+        logger.debug(f'{self.name} load stats: min {min(load)} max {max(load)} mean {load.mean()}')
+        
+        
 class Soundcard:
     """Represents a sound card with an input and output."""
-    
+
     # numpy number formats and byte widths indexed by the corresponding pyaudio format.
     numpy_by_pyaudio_formats = {
         pyaudio.paFloat32: (np.float32, 4),
@@ -469,12 +506,12 @@ class Soundcard:
         I don't think this latency is CPU bound, since increasing frames_per_buffer to 512
         drops reported CPU load to around .1. So I think the issue is in one or more of the
         audio hardware, kernel configuration, or IPC.
-        """        
+        """
         self.io = pyaudio.PyAudio()
 
-        # These are inputs and outputs from the perspective of other nodes, not from the 
+        # These are inputs and outputs from the perspective of other nodes, not from the
         # hardware device. This class reads from input and writes to output.
-        self.input = AudioStream()
+        self.input = AudioQueue(num_frames=frames_per_buffer)
         self.output = AudioStream()
 
         # Use one device index for a sound card.
@@ -499,7 +536,7 @@ class Soundcard:
     def is_terminated(self):
         return self.state == 'terminated'
 
-    def start(self, processor):
+    def start(self):
         """Starts reading and writing audio data.
         
         processor is a function from (frames, channels) inputs to (frames, channels) outputs
@@ -511,6 +548,7 @@ class Soundcard:
         sample_format, sample_width = self.numpy_by_pyaudio_formats[
             self.device_sample_format]
 
+        perf_timer = PerfTimer('stream', period = self.frames_per_buffer / self.sampling_rate)
         def stream_callback(in_data, frame_count, time_info, status_flags):
             if not self.is_running():
                 logger.info('stopping')
@@ -520,22 +558,30 @@ class Soundcard:
                 logger.warning('Unexpected frame count %d', frame_count)
             if status_flags != 0:
                 logger.warning('Nonzero status %d', status_flags)
-            
+
             cpu_load = self.stream.get_cpu_load()
             if cpu_load > 0.9:
                 logger.warning(f'High CPU load {cpu_load}')
-            
+
             in_data = np.frombuffer(in_data, dtype=sample_format).astype(
                 self.processor_sample_format).reshape(frame_count,
                                                       self.channels)
-                
+            
             try:
-                out_data = processor(in_data)
+                perf_timer.start()
+                self.output.write(in_data)
+                if self.input.read_available() != frame_count:
+                    logger.warning(
+                        f'Unexpected frame count at input {self.input.read_available()}'
+                    )
+                out_data = self.input.read(frame_count)
+                perf_timer.end()
             except:
                 logger.error("Error in soundcard callback", exc_info=True)
                 return (b'\x00' * len(in_data), pyaudio.paComplete)
-
-            return (out_data.astype(sample_format).tobytes(), pyaudio.paContinue)
+                
+            return (out_data.astype(sample_format).tobytes(),
+                    pyaudio.paContinue)
 
         self.stream = self.io.open(rate=self.sampling_rate,
                                    channels=self.channels,
@@ -559,34 +605,123 @@ class Soundcard:
             self.stop()
             self.io.terminate()
             self.state = 'terminated'
+
+        
+class SignalMonitor:
+    """Subscribes to signals and provides callbacks for plotting and analysis.
+    
+    def transfer_function(input, output):
+        def plot_transfer(in_data, out_data):
+            ...plot
+            
+        monitor = SignalMonitor()
+        monitor.signals = [input, output]
+        monitor.callback = plot_transfer
+        monitor.start()
+    """
+    
+    def __init__(self):
+        # List of AudioStreams to monitor
+        self.signals = []
+        self.update_rate = 1
+        self.callback = self.log_basic
+        self.fig = None
+        
+        self._animation = None
+    
+    def start(self):
+        if self._animation:
+            self.stop()
+        if not self.fig:
+            self.fig = plt.gcf()
+
+        self.buffers = []
+        for signal in self.signals:
+            buffer_size = round(3 * AudioConstants.sampling_rate / self.update_rate)
+            buffer = AudioBuffer(num_frames=buffer_size)
+            signal.add_sink(buffer)
+            self.buffers.append(buffer)
+            
+        self._animation = FuncAnimation(self.fig, self._update, interval = 1e3 / self.update_rate)
+        self.fig.canvas.draw_idle()
+    
+    def stop(self):
+        self._animation.event_source.stop()
+        self._animation = None 
+        for i in range(len(self.signals)):
+            self.signals[i].remove_sink(self.buffers[i])
+        
+    def _update(self, *args):
+        try:
+            datas = [buffer.read(buffer.read_available()) for buffer in self.buffers]
+            self.callback(*datas)
+        except:
+            logger.error('Error in monitor callback', exc_info=True)
+        
+    def log_basic(self, *datas):
+        logger.info(f'Monitor of {len(datas)} signals:')
+        for data in datas:
+            logger.info(f'     shape: {data.shape}')
+            
     
 class Daw:
 
-    def __init__(self, name='Daw'):
+    def __init__(self, name='Daw', fig = None, ax = None):
         self.name = name
-        self.soundcard = Soundcard(frames_per_buffer=1024)
+        self.ax = ax if ax is not None else plt.gca()
+        self.soundcard = Soundcard(frames_per_buffer=4096)
+        self.soundcard.output.add_sink(self.soundcard.input)
+        
+        self.monitor = SignalMonitor()
+        self.monitor.update_rate = 1
+        self.monitor.signals = [self.soundcard.output]
+        self.monitor.callback = self._update_monitor
+        self.monitor.fig = fig if fig is not None else plt.gcf()
+        
+        self._update_timer = PerfTimer('Daw._update_monitor', n = 3, period = 1 / self.monitor.update_rate)
+        
         self._run()
+
+    def _update_monitor(self, soundcard_output):
+        assert AudioConstants.num_channels == 1
+        if not soundcard_output.shape[0]:
+            logger.warning('No new soundcard data')
+            return
+        
+        self._update_timer.start()
+        fft = librosa.stft(soundcard_output.flatten())
+        db = librosa.amplitude_to_db(abs(fft))
+        librosa.display.specshow(db,
+                                 sr=AudioConstants.sampling_rate, 
+                                 x_axis='time',
+                                 y_axis='log',
+                                 ax=self.ax)
+#         plt.colorbar(format='%+2.0f dB')
+        plt.title('Log-frequency power spectrogram')
+        self._update_timer.end()
 
     def _run(self):
         soundcard = self.soundcard
+        monitor = self.monitor
+        
         run_button = widgets.Button(description="Start")
         terminate_button = widgets.Button(description="Terminate")
-
         debug_view = widgets.Output(layout={'border': '1px solid white'})
-        
-        @debug_view.capture(clear_output=True)
+
+        @debug_view.capture(clear_output=False)
         def toggle_playback(b):
             if soundcard.is_running():
                 logger.info("Stopping")
+                monitor.stop()
                 soundcard.stop()
 
                 # Next action is start
                 run_button.description = "Start"
             elif soundcard.is_idle():
                 logger.info("Starting")
-                processor = lambda x: np.tile(x[:, 0:1], 2)
-                soundcard.start(processor)
-
+                monitor.start()
+                soundcard.start()
+                
                 # Next action is stop
                 run_button.description = "Stop"
 
