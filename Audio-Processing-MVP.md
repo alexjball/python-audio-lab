@@ -24,10 +24,8 @@ I will initially use the library for my own blog posts, and advertise the librar
 - Guitar pickup transfer function -- How is this different from the existing articles?
 - Effect simulation
 - Pitch estimation
-- Mea
-I should either render a notebook or use it to render images for a blog post about measuring guitar pickups. I can follow up with other articles while I polish the library.
-
+- Guitar modeling -- especially body response.
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTQzNDc1NDY2OCwxMDQ2NzE5OTIwXX0=
+eyJoaXN0b3J5IjpbMTY0MzUyMDA0MSwxMDQ2NzE5OTIwXX0=
 -->
