@@ -481,6 +481,7 @@ class PerfTimer:
     
     def log_stats(self, dt):
         load = dt / self.period
+        logger.debug(f'{self.name} dt stats: min {min(dt)} max {max(dt)} mean {dt.mean()}')
         logger.debug(f'{self.name} load stats: min {min(load)} max {max(load)} mean {load.mean()}')
         
         
