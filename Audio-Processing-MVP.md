@@ -1,10 +1,12 @@
+# Audio Processing MVP
+
 # Goals
 Explore/prototype approaches for automatic guitar transcription.
 
 # Non-goals
 Create something tha works outside a dev/rapid-eval environment
 
-# MVP Requirements/Structure
+# Requirements/Structure
 1. Processing/analyzing an audio stream
 2. Command line for running analyses on files or audio inputs
 3. UX prototype GUI. Displays analysis in an interactive or live fassion.
@@ -17,8 +19,13 @@ Jupyter notebooks are composed of cells of code or markdown. Code cells execute 
 
 The page will have a global input/output buffer that is initialized with the notebook. The user uses this to set up their source, and cells use this to read and output processed audio. Ideally, the user can use the same interface to process audio files/existing sound, and the filtering cells access a common abstraction.
 
-# Next Steps
-I should either render a notebook or use it to render images for a blog post about measuring guitar pickups. 
+# Release
+I will initially use the library for my own blog posts, and advertise the library after it's matured. But I should make the library public asap, for transparency. Some blog post ideas:
+- Guitar pickup transfer function -- How is this different from the existing articles?
+- Effect simulation
+- Pitch estimation
+- Guitar modeling -- especially body response.
+
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTI1Mzc2ODc5NiwxMjUyMDcwNDRdfQ==
+eyJoaXN0b3J5IjpbMTY0MzUyMDA0MSwxMDQ2NzE5OTIwXX0=
 -->
