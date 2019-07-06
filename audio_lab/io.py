@@ -8,30 +8,6 @@ import time
 
 logger = logging.getLogger(__name__)
 
-def print_pyaudio_devices():
-    """Print info about host API's, devices, and defaults"""
-
-    # Initialize PyAudio
-    pa = pyaudio.PyAudio()
-    default_host_index = pa.get_default_host_api_info()['index']
-    default_input_device_index = pa.get_default_input_device_info()['index']
-    default_output_device_index = pa.get_default_output_device_info()['index']
-
-    print('Host API\'s')
-    for i in range(pa.get_host_api_count()):
-        if i == default_host_index: print("Default:")
-        pprint(pa.get_host_api_info_by_index(i))
-
-    print('\nDevices')
-    for i in range(pa.get_device_count()):
-        if i == default_input_device_index: print("Default Input:")
-        if i == default_output_device_index: print("Default Output:")
-        pprint(pa.get_device_info_by_index(i))
-
-    # Clean up PyAudio
-    pa.terminate()
-
-
 class AudioConstants:
     """Constants used by framework types"""
     # Sampling rate and the number of channels must be consistent throughout the graph, so
@@ -493,6 +469,28 @@ class PerfTimer:
             f'{self.name} load stats: min {min(load)} max {max(load)} mean {load.mean()}'
         )
 
+def print_pyaudio_devices():
+    """Print info about host API's, devices, and defaults"""
+
+    # Initialize PyAudio
+    pa = pyaudio.PyAudio()
+    default_host_index = pa.get_default_host_api_info()['index']
+    default_input_device_index = pa.get_default_input_device_info()['index']
+    default_output_device_index = pa.get_default_output_device_info()['index']
+
+    print('Host API\'s')
+    for i in range(pa.get_host_api_count()):
+        if i == default_host_index: print("Default:")
+        pprint(pa.get_host_api_info_by_index(i))
+
+    print('\nDevices')
+    for i in range(pa.get_device_count()):
+        if i == default_input_device_index: print("Default Input:")
+        if i == default_output_device_index: print("Default Output:")
+        pprint(pa.get_device_info_by_index(i))
+
+    # Clean up PyAudio
+    pa.terminate()
 
 class Soundcard:
     """
@@ -571,7 +569,6 @@ class Soundcard:
                                period=self.frames_per_buffer /
                                self.sampling_rate)
 
-        cb_i = 1e9
         def stream_callback(in_data, frame_count, time_info, status_flags):
             if not self.is_running():
                 logger.info('stopping')
@@ -590,12 +587,6 @@ class Soundcard:
                 self.processor_sample_format).reshape(frame_count,
                                                       self.channels)
 
-            nonlocal cb_i
-            if cb_i >= 10:
-                cb_i = 0
-                logger.info(f'cb time info {time_info} I/O latency {time_info["output_buffer_dac_time"] - time_info["input_buffer_adc_time"]} perf counter {time.perf_counter()} real time {time.time()}')
-            else:
-                cb_i += 1
             try:
                 perf_timer.start()
                 self.output.write(in_data)
