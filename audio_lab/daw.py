@@ -8,16 +8,11 @@ import librosa
 import librosa.display
 import time
 
-import jupyter_utils
-
+import audio_lab.jupyter_utils as jupyter_utils
 from audio_lab.io import *
 
-# Set up a logger that the DAW displays in its cell.
-logger = jupyter_utils.get_cell_logger(__name__)
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
-
-# UI and Application:
 
 class SignalMonitor:
     """Subscribes to signals and provides callbacks for plotting and analysis.
@@ -80,25 +75,10 @@ class SignalMonitor:
         for data in datas:
             logger.info(f'     shape: {data.shape}')
 
-class Spectrogram:
-    """Plots a spectrogram"""
-    pass
-
-class TransferFunction:
-    """Plots a transfer function"""
-    pass
-
-class PickupTester:
-    """
-    Drives an inductor and measures pickup frequency response.
-
-    TODO: account for IO lag by delaying soundcard output by num_frames / sr
-    """
-    pass
 
 class Daw:
     """A simple interface for recording, processing, and playing audio."""
-    # TODO: Update this to use new UI
+
     def __init__(self, name='Daw', fig=None, ax=None):
         self.name = name
         self.ax = ax if ax is not None else plt.gca()
@@ -131,7 +111,6 @@ class Daw:
                                  x_axis='time',
                                  y_axis='log',
                                  ax=self.ax)
-        #         plt.colorbar(format='%+2.0f dB')
         plt.title('Log-frequency power spectrogram')
         self._update_timer.end()
 
@@ -170,7 +149,7 @@ class Daw:
         terminate_button.on_click(terminate_cell)
         display(run_button)
         display(terminate_button)
-        logger.show_logs()
+        jupyter_utils.get_cell_logger().show_logs()
         display(debug_view)
 
     def terminate(self):

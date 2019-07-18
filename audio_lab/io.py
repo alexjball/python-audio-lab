@@ -8,6 +8,7 @@ import time
 
 logger = logging.getLogger(__name__)
 
+
 class AudioConstants:
     """Constants used by framework types"""
     # Sampling rate and the number of channels must be consistent throughout the graph, so
@@ -36,7 +37,7 @@ class AudioSource:
 class AudioSink:
     """Simple interface for sinks of audio data"""
 
-    def write(self, data, ):
+    def write(self, data):
         """Writes (num_frames, num_channels) data, potentially blocking."""
         raise NotImplementedError()
 
@@ -206,7 +207,7 @@ class AudioTransform:
         """resets all inputs"""
         self.unset_inputs = set()
         for input in self.inputs:
-            self.input.reset()
+            input.reset()
             self.unset_inputs.add(input.id)
 
 
@@ -469,6 +470,7 @@ class PerfTimer:
             f'{self.name} load stats: min {min(load)} max {max(load)} mean {load.mean()}'
         )
 
+
 def print_pyaudio_devices():
     """Print info about host API's, devices, and defaults"""
 
@@ -491,6 +493,7 @@ def print_pyaudio_devices():
 
     # Clean up PyAudio
     pa.terminate()
+
 
 class Soundcard:
     """
@@ -527,8 +530,9 @@ class Soundcard:
 
         # These are inputs and outputs from the perspective of other nodes, not from the
         # hardware device. This class reads from input and writes to output.
-        self.input = AudioQueue(num_frames=frames_per_buffer)
-        self.output = AudioStream() 
+        self.input = AudioQueue(num_frames=frames_per_buffer,
+                                num_channels=channels)
+        self.output = AudioStream()
 
         # Use one device index for a sound card.
         self.device_index = device_index
@@ -555,8 +559,6 @@ class Soundcard:
 
     def start(self):
         """Starts reading and writing audio data.
-        
-        processor is a function from (frames, channels) inputs to (frames, channels) outputs
         """
 
         if not self.is_idle():

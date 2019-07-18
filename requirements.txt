@@ -1,3 +1,2 @@
--e git+https://github.com/mwickert/scikit-dsp-comm.git@v1.1.0#egg=scikit-dsp-comm
 pyaudio
 librosa
